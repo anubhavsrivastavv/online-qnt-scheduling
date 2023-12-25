@@ -1,15 +1,17 @@
 import numpy as np
 import networkx as nx
 import math
+import colors
+import sys
 
 # scale, epsilon = 1, 0.1
-scale, epsilon = 1, 1
-alpha, U = 1, 0.001   #U=0, doesn't work -> division by 0 in r
+scale, epsilon = 1, 0.1
+alpha, U = 1, 1   #U=0, doesn't work -> division by 0 in r
 
 
 # Create the graph
-E = [(1, 2), (2, 3), (2, 4)]
-C = [2, 1, 1]  #(edge id, capacity)
+E = [(1, 2), (2, 3), (2, 4), (3, 4)]
+C = [2, 1, 1, 1]  #(edge id, capacity)
 E_dict = {}
 for idx, e in enumerate(E):
     E_dict[e] = idx
@@ -21,21 +23,34 @@ nx.draw_networkx(G)
 # Create demand set
 N, T = 2, 3
 
-D = [(1, 3, 2, 1, 3), (1, 4, 1, 1, 2)] #(s, e, d, ST, ET)
+D = [(1, 4, 3, 1, 3), (1, 3, 1, 1, 1)] #(s, e, d, ST, ET)
 # D = [(1, 3, 2, 1, 3), (1, 4, 1, 1, 1)]
 
 # Find the candidate paths for all demands
 P = {}
 for i in range(N):
     all_p = []
-    for p in nx.all_simple_paths(G, D[i][0], D[i][1], 2):
+    for p in nx.all_simple_paths(G, D[i][0], D[i][1], 3):
+        print(f'demand: {i} path: {p}')
         p_idx = []
         for j in range(len(p)-1):
-            p_idx.append(E_dict[(p[j], p[j+1])])
+            if (p[j], p[j+1]) in E_dict:
+                p_idx.append(E_dict[(p[j], p[j+1])])
+            else:
+                p_idx.append(E_dict[(p[j+1], p[j])])
         all_p.append(p_idx)
     P[i] = all_p
 
 print(P)
+p1 = len(C)*(T+1)+len(D)
+p2 = len(D)**(1+epsilon)/(1-(epsilon/2))
+print(p1, p2)
+scale = np.log((len(C)*(T+1)+len(D))*(len(D)**(1+epsilon)/(1-(epsilon/2))))
+print(scale)
+scale = np.log(p1*p2)
+print(scale)
+scale = np.ceil(scale)
+print(scale)
 
 # Set u_{i,p,t} values
 u = {}
@@ -77,7 +92,13 @@ def compute_li():
         for t in range(D[i][3], D[i][4]+1):
             for idx, p in enumerate(P[i]):
                 L[f'l_{i}'] += F[f'f_{i}_{idx}_{t}']
-    
+
+def li(i):
+    l_i= 0
+    for t in range(D[i][3], D[i][4]+1):
+        for idx, p in enumerate(P[i]):
+            l_i += F[f'f_{i}_{idx}_{t}']
+    return l_i
 
 #Utility --- (3):
 g = 0
@@ -117,47 +138,71 @@ print(r)
 
 def should_loop():
     for i in range(N):
-        print(f'inside should loop alpha, L[l_{i}], alpha*D[i][2], U, g: {alpha, L[f"l_{i}"], alpha*D[i][2], U, g}')
-        if L[f'l_{i}'] < alpha*D[i][2] or g < U:
-            print('yes - loop')
+        print(colors.yellow + f'inside should loop alpha, L[l_{i}], alpha*D[i][2], U, g: {alpha, L[f"l_{i}"], alpha*D[i][2], U, g}')
+        # if L[f'l_{i}'] < alpha[i]*D[i][2] or g < U:
+        # l_i = li(i)
+        # print(l_i)
+        # if  l_i < alpha[i]*D[i][2]:
+        if L[f'l_{i}'] < alpha[i]*D[i][2]:
+            print(colors.bright_white + 'yes - loop')
             return True
-    print('no - dont loop')
+    print(colors.bright_white + 'no - dont loop')
     return False
 
 def find_req():
     for i in range(N):
         for t in range(D[i][3], D[i][4]+1):
             for idx, p in enumerate(P[i]):
-                print(f'{i, t, idx}')
-                left_side_num = (sum([Y[f'y_{e}_{t}']/C[e] for e in p])+Q[f'q_{i}']/D[i][2])
-                left_side_den = 0
-                for e in range(len(E)):
-                    for t_prime in range(T):
-                        left_side_den += Y[f'y_{e}_{t_prime}']
-                for j in range(N):
-                    left_side_den += Q[f'q_{j}']
+                print(colors.bright_white + f'{i, t, idx}')
+                print(colors.pure_red+f'demand: {D[i]} and time: {t}')
+                print(colors.dark_green +f'(edge index, edge, capacity) :{[(e, E[e], C[e]) for e in p]}')
+                print(f'Edges: {E}')
+                print(f'Capacity: {C}')
+                print(f'Y: {Y}')
+                left_side_num = sum([Y[f'y_{e}_{t}']/C[e] for e in p])+Q[f'q_{i}']/D[i][2]
+                left_side_den = sum(Y.values()) + sum(Q.values())
+                # print(f'left_side_den: {left_side_den}')
+                # left_side_den = 0
+                # for e in range(len(E)):
+                #     for t_prime in range(T+1):
+                #         left_side_den += Y[f'y_{e}_{t_prime}']
+                # for j in range(N):
+                #     left_side_den += Q[f'q_{j}']
+                # print(f'left_side_den: {left_side_den}')
                 
                 right_side_num = 0
-                if L[f'l_{i}'] < alpha*D[i][2]:
-                    right_side_num += Z[f'z_{i}']/alpha*D[i][2]
-                if g < U:
-                    right_side_num += u[f'u_{i}_{idx}_{t}']*r/U
+                l_i = li(i)
+                print(f'l_i: {l_i} and alpha[i]*D[i][2]: {alpha[i]*D[i][2]}')
+                print(f'Z: {Z}')
+                if L[f'l_{i}'] < alpha[i]*D[i][2]:
+                # if l_i < alpha[i]*D[i][2]:
+                    right_side_num += Z[f'z_{i}']/(alpha[i]*D[i][2])
+                # if g < U:
+                #     right_side_num += u[f'u_{i}_{idx}_{t}']*r/U
 
                 right_side_den = 0
                 for j in range(N):
-                    if L[f'l_{j}'] < alpha*D[j][2]:
+                    if L[f'l_{j}'] < alpha[j]*D[j][2]:
                         right_side_den+= Z[f'z_{j}']
-                if g < U:
-                    right_side_den+= r
+                # if g < U:
+                #     right_side_den+= r
                 
                 # print(f'{i, t, idx}')
+                print(colors.bold + f'left num: {left_side_num} den:{left_side_den}')
+                print(colors.bold + f'right num: {right_side_num} den:{right_side_den}')
+                print(colors.bold + f'left val: {left_side_num/left_side_den} right val: {right_side_num/right_side_den}')
                 if left_side_num/left_side_den <= right_side_num/right_side_den:
                     # print(f'{i, t, idx}')
+                    print(colors.bright_white + 'found')
                     return (i, t, idx)
+    print(colors.bright_white)
     return None
 
 # for alpha in np.arange(0.1, 1.1, 0.1):
-for alpha in np.arange(1/D[0][2], (D[0][2]+1)/D[0][2], 1/D[0][2]):
+max_D = max([D[i][2] for i in range(len(D))])
+for nEPR in range(1, max_D+1, 1):
+    alpha = [nEPR/D[i][2] if nEPR<D[i][2] else 1 for i in range(len(D))]
+    print(f'computed alpha: {alpha}')
     isInfeasible = False
     while should_loop():
         print(f'alpha: ------ {alpha}')
@@ -169,7 +214,7 @@ for alpha in np.arange(1/D[0][2], (D[0][2]+1)/D[0][2], 1/D[0][2]):
             break
 
         i_star, t_star, p_star = request
-        # print(i_star, t_star, p_star)
+        print(i_star, t_star, p_star)
         min_ = math.inf  #Finding min edge capacity along the path p_star
         for e in P[i_star][p_star]:
             # print(P[i_star][p_star])
@@ -180,22 +225,25 @@ for alpha in np.arange(1/D[0][2], (D[0][2]+1)/D[0][2], 1/D[0][2]):
         gamma = epsilon*min(D[i_star][2], min_)
         print(f'gamma: {gamma}')
 
-        if L[f'l_{i_star}'] < alpha*D[i_star][2]:
-            gamma = min(gamma, epsilon*alpha*D[i_star][2])
+        if L[f'l_{i_star}'] < alpha[i_star]*D[i_star][2]:
+            gamma = min(gamma, epsilon*alpha[i_star]*D[i_star][2])
         
         print(f'gamma: {gamma}')
 
-        if g < U:
-            gamma = min(gamma, epsilon*U/u[f'u_{i_star}_{p_star}_{t_star}'])
+        # if g < U:
+        #     gamma = min(gamma, epsilon*U/u[f'u_{i_star}_{p_star}_{t_star}'])
         
         print(f'gamma: {gamma}')
         
         for e in P[i_star][p_star]:
+            print(f"Bef updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")
             Y[f'y_{e}_{t_star}'] = Y[f'y_{e}_{t_star}']*np.exp(gamma/C[e])
+            print(f"Aft updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")     
+        
         
         Q[f'q_{i_star}'] = Q[f'q_{i_star}']*np.exp(gamma/D[i_star][2])
 
-        Z[f'z_{i_star}'] = Z[f'z_{i_star}']*np.exp(-gamma/alpha*D[i_star][2])
+        Z[f'z_{i_star}'] = Z[f'z_{i_star}']*np.exp(-gamma/(alpha[i_star]*D[i_star][2]))
 
         r = r*np.exp((-u[f'u_{i_star}_{p_star}_{t_star}']*gamma)/U)
 
@@ -211,15 +259,5 @@ for alpha in np.arange(1/D[0][2], (D[0][2]+1)/D[0][2], 1/D[0][2]):
     # break
 
     if isInfeasible:
-        print(f'max alpha: {alpha-0.1}')
+        print(f'max alpha: {[a - 0.1 for a in alpha]}')
         break
-
-
-
-
-
-
-
-
-
-
