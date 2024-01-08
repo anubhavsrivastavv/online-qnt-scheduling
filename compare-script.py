@@ -7,9 +7,12 @@ import time
 import random
 
 v = 9
-N, T = 50, 5
+N, T = 20, 5
 E = [(0, 1), (1, 2), (0, 4), (1, 3), (2, 5), (4, 3), (3, 5), (4, 6), (3, 7), (5, 8), (6, 7), (7, 8)]
 C = [2, 3, 3, 2, 3, 4, 2, 2, 1, 3, 2, 5]  #(edge id, capacity)
+
+scale, epsilon = 1, 0.1
+U = 1
 
 E_dict = {}
 for idx, e in enumerate(E):
@@ -21,15 +24,14 @@ nx.draw_networkx(G)
 W_adj = nx.to_numpy_array(G)
 print(W_adj)
 
+def demands_to_algo(start_nodes, end_nodes, D, DST, DT):
+    D_matrix = []
+    for i in range(N):
+        D_matrix.append((start_nodes[i], end_nodes[i], D[i], DST[i], DT[i]))
+    return D_matrix
 
 def youngs(v, N, T):
     ###In this N -> number of requests (k), len(E) -> number of edges (packing constraints)
-
-    start = time.time()
-    # scale, epsilon = 1, 0.1
-    scale, epsilon = 1, 1
-    alpha, U = 1, 0.5  #U=0, doesn't work -> division by 0 in r
-
     # Create the graph and demand set 
     #Test Case 1
     # v = 9
@@ -79,28 +81,22 @@ def youngs(v, N, T):
         start_times, end_times = list(zip(*demand_intervals))
         # start_times = list(start_times)
         # end_times = list(end_times)
-        print(start_times)
-        print(end_times)
+        #print(start_times)
+        #print(end_times)
 
         return start_nodes, end_nodes, demand_sizes, start_times, end_times
-
-    def demands_to_algo(start_nodes, end_nodes, D, DST, DT):
-        D_matrix = []
-        for i in range(N):
-            D_matrix.append((start_nodes[i], end_nodes[i], D[i], DST[i], DT[i]))
-        return D_matrix
         
 
     start_nodes, end_nodes, D_size, DST, DT = generate_demands(nb_demands=N, nb_nodes=v, nb_timesteps=T, max_eprs=5)
     D = demands_to_algo(start_nodes, end_nodes, D_size, DST, DT)
-    print(D)
+    #print(D)
 
     # E_dict = {}
     # for idx, e in enumerate(E):
     #     E_dict[e] = idx
 
     # G = nx.Graph(E)
-    # print(G)
+    # #print(G)
     # nx.draw_networkx(G)
 
     # Find the candidate paths for all demands
@@ -109,7 +105,7 @@ def youngs(v, N, T):
     for i in range(N):
         all_p = []
         for p in nx.all_simple_paths(G, D[i][0], D[i][1], 3):
-            print(f'demand: {i} path: {p}')
+            #print(f'demand: {i} path: {p}')
             p_idx = []
             for j in range(len(p)-1):
                 e_idx = -1
@@ -127,23 +123,24 @@ def youngs(v, N, T):
             all_p.append(p_idx)
         P[i] = all_p
 
-    print(P)
+    #print(P)
 
     # scale = np.ceil(np.log((len(C)*(T+1)+len(D))*(len(D)**(1+epsilon)/(1-(epsilon/2)))))
-    # print(scale)
+    # #print(scale)
 
     # scale = np.log(len(E)*T*N) 
 
     scale = 1
-    print(scale)
+    #print(scale)
 
+    start = time.time()
     # Set u_{i,p,t} values
     u = {}
     for i in range(N):
         for idx, p in enumerate(P[i]):
             for t in range(D[i][3], D[i][4]+1):
                 u[f'u_{i}_{idx}_{t}'] = 1/(N*D[i][2])
-                print(u)
+                #print(u)
 
     #Flow variables:
     F = {}
@@ -203,71 +200,74 @@ def youngs(v, N, T):
     Y = {}
     for e in range(len(E)):
         for t in range(T+1):
-            Y[f'y_{e}_{t}'] = np.exp((scale*H[f'h_{e}_{t}'])/(epsilon*C[e]))
+            # Y[f'y_{e}_{t}'] = np.exp((scale*H[f'h_{e}_{t}'])/(epsilon*C[e]))
+             Y[f'y_{e}_{t}'] = 1
 
-    print(Y)
+    #print(Y)
     #q_i
     Q = {}
     for i in range(N):
-        Q[f'q_{i}'] = np.exp((scale*L[f'l_{i}'])/(epsilon*D[i][2]))
-    print(Q)
+        # Q[f'q_{i}'] = np.exp((scale*L[f'l_{i}'])/(epsilon*D[i][2]))
+        Q[f'q_{i}'] = 1
+    #print(Q)
 
     #z_i
     Z = {}
     for i in range(N):
-        Z[f'z_{i}'] = np.exp(-(scale*L[f'l_{i}'])/(epsilon*alpha*D[i][2]))
-    print(Z)
+        # Z[f'z_{i}'] = np.exp(-(scale*L[f'l_{i}'])/(epsilon*alpha*D[i][2]))
+        Z[f'z_{i}'] = 1
+    #print(Z)
 
     r = np.exp(-(scale*g)/(epsilon*U))
-    print(r)
+    #print(r)
 
     """
         Calendering paper implementation
     """
     def should_loop():
         for i in range(N):
-            print(colors.yellow + f'inside should loop alpha[{i}], L[l_{i}], alpha[{i}]*D[i][2], U, g: {alpha[i], L[f"l_{i}"], alpha[i]*D[i][2], U, g}')
+            #print(colors.yellow + f'inside should loop alpha[{i}], L[l_{i}], alpha[{i}]*D[i][2], U, g: {alpha[i], L[f"l_{i}"], alpha[i]*D[i][2], U, g}')
             # if L[f'l_{i}'] < alpha[i]*D[i][2] or g < U:
             # l_i = li(i)
-            # print(l_i)
+            # #print(l_i)
             # if  l_i < alpha[i]*D[i][2]:
             if L[f'l_{i}'] < alpha[i]*D[i][2]:
-                print(colors.bright_white + f'yes loop, req_details: {D[i]}')
+                #print(colors.bright_white + f'yes loop, req_details: {D[i]}')
                 return True
-        print(colors.bright_white + 'no - dont loop')
+        #print(colors.bright_white + 'no - dont loop')
         return False
 
     def find_req():
         for i in range(N):
             for t in range(D[i][3], D[i][4]+1):
                 for idx, p in enumerate(P[i]):
-                    print(colors.bright_white + f'{i, t, idx}')
-                    print(colors.pure_red+f'demand: {D[i]} and time: {t}')
-                    print(colors.dark_green +f'(edge index, edge, capacity) :{[(e, E[e], C[e]) for e in p]}')
-                    print(f'Edges: {E}')
-                    print(f'Capacity: {C}')
-                    print(f'Y: {Y}')
-                    print(f'Q: {Q}')
+                    #print(colors.bright_white + f'{i, t, idx}')
+                    #print(colors.pure_red+f'demand: {D[i]} and time: {t}')
+                    #print(colors.dark_green +f'(edge index, edge, capacity) :{[(e, E[e], C[e]) for e in p]}')
+                    #print(f'Edges: {E}')
+                    #print(f'Capacity: {C}')
+                    #print(f'Y: {Y}')
+                    #print(f'Q: {Q}')
                     left_side_num = sum([Y[f'y_{e}_{t}']/C[e] for e in p])+Q[f'q_{i}']/D[i][2]
                     left_side_den = sum(Y.values()) + sum(Q.values())
 
-                    # print(f'left_side_den: {left_side_den}')
+                    # #print(f'left_side_den: {left_side_den}')
                     # left_side_den = 0
                     # for e in range(len(E)):
                     #     for t_prime in range(T+1):
                     #         left_side_den += Y[f'y_{e}_{t_prime}']
                     # for j in range(N):
                     #     left_side_den += Q[f'q_{j}']
-                    # print(f'left_side_den: {left_side_den}')
-                    print(colors.light_green)
-                    print(f'Req {i, (D[i])} Time: {t} and Path:{[E[e] for e in p]}')
-                    print(colors.bold + f'left num: {left_side_num} den:{left_side_den}')
+                    # #print(f'left_side_den: {left_side_den}')
+                    #print(colors.light_green)
+                    #print(f'Req {i, (D[i])} Time: {t} and Path:{[E[e] for e in p]}')
+                    #print(colors.bold + f'left num: {left_side_num} den:{left_side_den}')
 
                     right_side_num = 0
                     l_i = li(i)
-                    print(colors.yellow + f'Z: {Z}')
-                    print(colors.bright_white)
-                    print(f'l_i: {l_i} and alpha[i]*D[i][2]: {alpha[i]*D[i][2]}')
+                    #print(colors.yellow + f'Z: {Z}')
+                    #print(colors.bright_white)
+                    #print(f'l_i: {l_i} and alpha[i]*D[i][2]: {alpha[i]*D[i][2]}')
                     if L[f'l_{i}'] < alpha[i]*D[i][2]:
                     # if l_i < alpha[i]*D[i][2]:
                         right_side_num += Z[f'z_{i}']/(alpha[i]*D[i][2])
@@ -277,20 +277,20 @@ def youngs(v, N, T):
                     right_side_den = 0
                     for j in range(N):
                         if L[f'l_{j}'] < alpha[j]*D[j][2]:
-                            # print(f'added req: {D[j]}')
+                            # #print(f'added req: {D[j]}')
                             right_side_den+= Z[f'z_{j}']
-                        else:
-                            print(f'skipped req: {D[j]}')
+                        # else:
+                            #print(f'skipped req: {D[j]}')
                     # if g < U:
                     #     right_side_den+= r
                     
-                    print(colors.bold + f'right num: {right_side_num} den:{right_side_den}')
-                    print(colors.bold + f'left val: {left_side_num/left_side_den} right val: {right_side_num/right_side_den}')
+                    #print(colors.bold + f'right num: {right_side_num} den:{right_side_den}')
+                    #print(colors.bold + f'left val: {left_side_num/left_side_den} right val: {right_side_num/right_side_den}')
                     if left_side_num/left_side_den <= right_side_num/right_side_den:
-                        # print(f'{i, t, idx}')
-                        print(colors.bright_white + 'found')
+                        # #print(f'{i, t, idx}')
+                        #print(colors.bright_white + 'found')
                         return (i, t, idx)
-        print(colors.bright_white)
+        #print(colors.bright_white)
         return None
 
     iter = 0
@@ -299,44 +299,44 @@ def youngs(v, N, T):
         alpha = [a for i in range(len(D))]
     # for nEPR in range(1, max_D+1, 1):
         # alpha = [nEPR/D[i][2] if nEPR<D[i][2] else 1 for i in range(len(D))]
-        print(f'computed alpha: {alpha}')
+        #print(f'computed alpha: {alpha}')
         isInfeasible = False
         while should_loop():
             iter += 1
-            print(f'alpha: ------ {alpha} and iteration : {iter}')
+            #print(f'alpha: ------ {alpha} and iteration : {iter}')
             request = find_req()
             # break
 
             if request == None:
-                print(f'could not allocate at iteration: {iter}')
+                #print(f'could not allocate at iteration: {iter}')
                 break
 
             i_star, t_star, p_star = request
-            print(i_star, t_star, p_star)
+            #print(i_star, t_star, p_star)
             min_ = math.inf  #Finding min edge capacity along the path p_star
             for e in P[i_star][p_star]:
-                # print(P[i_star][p_star])
+                # #print(P[i_star][p_star])
                 e_capacity = C[e]
                 if e_capacity < min_:
                     min_ = e_capacity
 
             gamma = epsilon*min(D[i_star][2], min_)
-            print(f'gamma: {gamma}')
+            #print(f'gamma: {gamma}')
 
             if L[f'l_{i_star}'] < alpha[i_star]*D[i_star][2]:
                 gamma = min(gamma, epsilon*alpha[i_star]*D[i_star][2])
             
-            print(f'gamma: {gamma}')
+            #print(f'gamma: {gamma}')
 
             # if g < U:
             #     gamma = min(gamma, epsilon*U/u[f'u_{i_star}_{p_star}_{t_star}'])
             
-            print(f'gamma: {gamma}')
+            #print(f'gamma: {gamma}')
             
             for e in P[i_star][p_star]:
-                print(f"Bef updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")
+                #print(f"Bef updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")
                 Y[f'y_{e}_{t_star}'] = Y[f'y_{e}_{t_star}']*np.exp(gamma/C[e])
-                print(f"Aft updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")     
+                #print(f"Aft updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")     
             
             
             Q[f'q_{i_star}'] = Q[f'q_{i_star}']*np.exp(gamma/D[i_star][2])
@@ -346,18 +346,18 @@ def youngs(v, N, T):
             r = r*np.exp((-u[f'u_{i_star}_{p_star}_{t_star}']*gamma)/U)
 
             F[f'f_{i_star}_{p_star}_{t_star}'] = F[f'f_{i_star}_{p_star}_{t_star}'] + (epsilon/scale)*gamma
-            print(f'f_{i_star}_{p_star}_{t_star} updated by  {(epsilon/scale)*gamma}')
+            #print(f'f_{i_star}_{p_star}_{t_star} updated by  {(epsilon/scale)*gamma}')
         
             #End of While
             compute_li()
             g = compute_g(g)
-            print(F)
-            print(g)
+            #print(F)
+            #print(g)
         
         # break
 
         if isInfeasible:
-            print(f'max alpha: {[a - 0.1 for a in alpha]}')
+            #print(f'max alpha: {[a - 0.1 for a in alpha]}')
             break
     """
         End Calendering Paper implementation
@@ -369,18 +369,18 @@ def youngs(v, N, T):
     """
     t_begin_post = time.time()
     #We have a prelimnary value of f now:
-    print(colors.bright_blue+'Computed f by Youngs method')
-    print(F)
+    #print(colors.bright_blue+'Computed f by Youngs method')
+    #print(F)
 
     for f, v in F.items():
         F[f] = round(v)
 
-    print(colors.light_green + 'Clipped F by rounding')
-    print(F)   #Clipped values of f
+    #print(colors.light_green + 'Clipped F by rounding')
+    #print(F)   #Clipped values of f
 
     #Heursitic to correct the edge usage and adjust allocations
     alpha = [li(i)/D[i][2] for i in range(N)]
-    print(alpha)
+    #print(alpha)
 
     def get_edge_allocations():
         edge_alloc = {}
@@ -397,8 +397,8 @@ def youngs(v, N, T):
         return edge_alloc
 
     edge_allocation = get_edge_allocations()
-    print(colors.bright_white + 'The edge allocations are given below')
-    print(edge_allocation)
+    #print(colors.bright_white + 'The edge allocations are given below')
+    #print(edge_allocation)
 
     #Find the edges where allocation exceeds capacity
     def get_conflicts(edge_alloc):
@@ -416,16 +416,16 @@ def youngs(v, N, T):
         return conflicts
 
     conflicts_ = get_conflicts(edge_allocation)
-    print(colors.pure_red+'detected conflicts')
-    print(conflicts_)
+    #print(colors.pure_red+'detected conflicts')
+    #print(conflicts_)
 
     def remove_flow(conflicts):
         #Sort the flows along each conflicted edge in descending order of alpha(fraction completed)
         for e, paths in conflicts.items():
             paths.sort(key=lambda tup: tup[2])
 
-        print(colors.light_green+'Sorted Conflicts')
-        print(conflicts)
+        #print(colors.light_green+'Sorted Conflicts')
+        #print(conflicts)
         #Remove the flow with max alpha
         for edge_time, paths in conflicts.items():
             _ , t = edge_time
@@ -438,19 +438,19 @@ def youngs(v, N, T):
     #Recompute the conflicts, while no conflicts remain repeat
     while len(conflicts_.keys()) > 0:
         conflicts_ = remove_flow(conflicts_)
-        print(colors.yellow + f'After removing flow with max alpha \nUpdated F:')
-        print(F)
+        #print(colors.yellow + f'After removing flow with max alpha \nUpdated F:')
+        #print(F)
 
-        print(colors.dark_green + f'Conflicts after removing flow')
-        print(conflicts_)
+        #print(colors.dark_green + f'Conflicts after removing flow')
+        #print(conflicts_)
         
         edge_allocation = get_edge_allocations()
-        print(colors.bright_white + f'Recomputed Edge Allocations')
-        print(edge_allocation)
+        #print(colors.bright_white + f'Recomputed Edge Allocations')
+        #print(edge_allocation)
         
         conflicts_ = get_conflicts(edge_allocation)
-        print(colors.pure_red + f'Recomputed Coflicts')
-        print(conflicts_)
+        #print(colors.pure_red + f'Recomputed Coflicts')
+        #print(conflicts_)
 
     end = time.time()
     t_end_post = time.time()
@@ -483,7 +483,7 @@ def youngs(v, N, T):
     print(f'Demands: {Demands}')
     print(f'Allocated: {D_alloc}')
 
-    return start_nodes, end_nodes, D_size, DST, DT, Demands, D_alloc
+    return start_nodes, end_nodes, D_size, DST, DT, Demands, D_alloc, end-start
 
 """
 ----------------------------
@@ -750,16 +750,405 @@ def lp(start_nodes, end_nodes, D, DST, DT, k, T):
         print('eprserved_lp: ', eprserved_lp)
     
     print(f'total EPR requested: {sum(D)}')
-    return alloc
+    return alloc, Tend_lp-Tstart_lp
+
+def youngs_online(start_nodes, end_nodes, D_size, DST, DT, N, T):
+    
+    start = time.time()
+    
+    D = demands_to_algo(start_nodes, end_nodes, D_size, DST, DT)
+    print(D)
+
+    # Find the candidate paths for all demands
+    P = {}
+    edge_path_map = {}
+    for i in range(N):
+        all_p = []
+        for p in nx.all_simple_paths(G, D[i][0], D[i][1], 3):
+            print(f'demand: {i} path: {p}')
+            p_idx = []
+            for j in range(len(p)-1):
+                e_idx = -1
+                if (p[j], p[j+1]) in E_dict:
+                    e_idx = E_dict[(p[j], p[j+1])]
+                else:
+                    e_idx = E_dict[(p[j+1], p[j])]
+                p_idx.append(e_idx)
+                
+                #Store all paths covering an edge
+                if e_idx not in edge_path_map:
+                    edge_path_map[e_idx] = [(i, len(all_p))] #len(all_p) points to number of paths stored for req i, therefore it is path index
+                else:
+                    edge_path_map[e_idx].append((i, len(all_p)))
+            all_p.append(p_idx)
+        P[i] = all_p
+
+    print(P)
+
+    # scale = np.ceil(np.log((len(C)*(T+1)+len(D))*(len(D)**(1+epsilon)/(1-(epsilon/2)))))
+    # print(scale)
+
+    # scale = np.log(len(E)*T*N) 
+
+    scale = 0.8
+    print(scale)
+
+    #Flow variables:
+    F = {}
+    for i in range(N):
+        for idx, p in enumerate(P[i]):
+            for t in range(D[i][3], D[i][4]+1):
+                F[f'f_{i}_{idx}_{t}'] = 0
+
+    #h_{e,t} ---> Not necessarily needed as Y_et is updated 
+    H = {}
+    for e in range(len(E)):
+        for t in range(T+1):
+            H[f'h_{e}_{t}'] = 0
+
+    #L_i
+    L = {}
+    for i in range(N):
+        for tau in range(T+1):
+            L[f'l_{i}_{tau}'] = 0
+
+    #Demand Satisfied  --- (2)
+    def l_i_tau(i, tau):
+        L[f'l_{i}_{tau}'] = 0
+        for t in range(max(tau, D[i][3]), D[i][4]+1):
+            for idx, p in enumerate(P[i]):
+                L[f'l_{i}_{tau}'] += F[f'f_{i}_{idx}_{t}']
+        return L[f'l_{i}_{tau}']
+
+    def F_i_tau(i, tau):
+        total_alloc = 0
+        for t in range(D[i][3], tau+1):
+            for idx, p in enumerate(P[i]):
+                total_alloc += F[f'f_{i}_{idx}_{t}']
+        return total_alloc
 
 
-start_nodes, end_nodes, D_size, DST, DT, Demands, D_alloc = youngs(v, N, T)
-lp_alloc = [int(i) for i in lp(start_nodes, end_nodes, D_size, DST, DT, N, T)]
+    """
+    Variables initialization
+    """
+    #y_{e,t}
+    Y = {}
+    for e in range(len(E)):
+        for t in range(T+1):
+            # Y[f'y_{e}_{t}'] = np.exp((scale*H[f'h_{e}_{t}'])/(epsilon*C[e]))
+            Y[f'y_{e}_{t}'] = 1
+    print(Y)
+
+    #q_i
+    Q = {}
+    for i in range(N):
+        # Q[f'q_{i}'] = np.exp((scale*L[f'l_{i}'])/(epsilon*D[i][2]))
+        Q[f'q_{i}'] = 1
+    print(Q)
+
+    #z_i
+    Z = {}
+    for i in range(N):
+        # Z[f'z_{i}'] = np.exp(-(scale*L[f'l_{i}'])/(epsilon*alpha*D[i][2]))
+        Z[f'z_{i}'] = 1
+    print(Z)
+
+
+    def R(tau): #relevant demands
+        valid_d = []
+        for i in range(N):
+            if tau>=D[i][3] and tau<=D[i][4]:
+                valid_d.append(i)
+        return valid_d
+
+    Beta, C_e_t, c = {}, {}, 10
+    for e in range(len(E)):
+        for tau in range(1, T):
+            for t in range(tau, T+1):
+                Beta[f'b_{e}_{t}_{tau}'] = np.exp(-(t-tau)/c)
+                C_e_t[f'C_{e}_{t}_{tau}'] = math.floor(Beta[f'b_{e}_{t}_{tau}']*C[e])
+
+
+    """
+        Calendering paper implementation
+    """
+    def should_loop(tau):
+        for i in R(tau):
+            print(colors.yellow + f'inside should loop alpha[{i}], L[l_{i}_{tau}], alpha[{i}]*D[i][2]: {alpha[i], L[f"l_{i}_{tau}"], alpha[i]*D[i][2]}')
+            if L[f'l_{i}_{tau}'] < alpha[i]*D[i][2] - F_i_tau(i, tau-1):
+                print(colors.bright_white + f'yes loop, req_details: {D[i]}')
+                return True
+        print(colors.bright_white + 'no - dont loop')
+        return False
+
+    def find_req(tau):
+        for i in R(tau):
+            for t in range(max(tau, D[i][3]), D[i][4]+1): #The flow variable should be >= the current timestep tau
+                for idx, p in enumerate(P[i]):
+                    print(colors.bright_white + f'{i, t, idx}')
+                    print(colors.pure_red+f'demand: {D[i]} and time: {t}')
+                    print(colors.dark_green +f'(edge index, edge, capacity) :{[(e, E[e], C[e]) for e in p]}')
+                    print(f'Edges: {E}')
+
+                    flag_path = False
+                    for e in p:
+                        print('Capcity', C[e], 'Allocable Capacity: ', C_e_t[f'C_{e}_{t}_{tau}'])
+                        #if any edges allocable capcity is 0, skip the path
+                        if C_e_t[f'C_{e}_{t}_{tau}'] == 0:
+                            flag_path = True
+                            break
+                    if flag_path:
+                        continue
+                    
+                    print(f'Y: {Y}')
+                    print(f'Q: {Q}')
+                    left_side_num = sum([Y[f'y_{e}_{t}']/C[e] for e in p])+Q[f'q_{i}']/(D[i][2]-F_i_tau(i, tau-1))
+                    left_side_den = 0
+                    for e in range(len(E)):
+                        for t_prime in range(tau, T+1):
+                            left_side_den += Y[f'y_{e}_{t_prime}']
+                    
+                    for i_prime in R(tau):
+                        left_side_den += Q[f'q_{i_prime}']
+
+
+                    print(colors.light_green)
+                    print(f'Req {i, (D[i])} Time: {t} and Path:{[E[e] for e in p]}')
+                    print(colors.bold + f'left num: {left_side_num} den:{left_side_den}')
+
+                    right_side_num = 0
+                    l_i_tao = l_i_tau(i, tau)
+                    print(colors.yellow + f'Z: {Z}')
+                    print(colors.bright_white)
+                    print(f'l_i: {l_i_tao} and alpha[i]*D[i][2]: {alpha[i]*D[i][2]}')
+                    if l_i_tao < alpha[i]*D[i][2] - F_i_tau(i, tau-1):
+                        right_side_num += Z[f'z_{i}']/(alpha[i]*D[i][2] - F_i_tau(i, tau-1))
+
+                    right_side_den = 0
+                    for j in R(tau):
+                        l_j_tao = l_i_tau(j, tau)
+                        print(f'Req: {j} l_j_tao: {l_j_tao} and alpha[j]*D[j][2]: {alpha[j]*D[j][2]}')
+                        if l_j_tao < alpha[j]*D[j][2] - F_i_tau(j, tau-1):
+                            right_side_den+= Z[f'z_{j}']
+                    
+                    if right_side_num == 0: #To handle division by 0 error
+                        right_side_den = 1
+
+                    print(colors.bold + f'right num: {right_side_num} den:{right_side_den}')
+                    print(colors.bold + f'left val: {left_side_num/left_side_den} right val: {right_side_num/right_side_den}')
+                    if left_side_num/left_side_den <= right_side_num/right_side_den:
+                        # print(f'{i, t, idx}')
+                        print(colors.bright_white + 'found')
+                        return (i, t, idx)
+        print(colors.bright_white)
+        return None
+
+    iter = 0
+
+    for tau in range(1, 2):
+        print(f'T: {tau}')
+        t_start_tau = time.time()
+        # max_D = max([D[i][2] for i in range(len(D))])
+        for a in np.arange(0.1, 1.1, 0.1):
+            alpha = [a for i in range(len(D))]
+        # for nEPR in range(1, max_D+1, 1):
+            # alpha = [nEPR/D[i][2] if nEPR<D[i][2] else 1 for i in range(len(D))]
+            print(f'computed alpha: {alpha}')
+            isInfeasible = False
+            while should_loop(tau):
+                iter += 1
+                print(f'alpha: ------ {alpha} and iteration : {iter}')
+                request = find_req(tau)
+                # break
+
+                if request == None:
+                    print(f'could not allocate at iteration: {iter}')
+                    break
+
+                i_star, t_star, p_star = request
+                print(i_star, t_star, p_star)
+                min_ = math.inf  #Finding min edge capacity along the path p_star
+                for e in P[i_star][p_star]:
+                    # print(P[i_star][p_star])
+                    e_capacity = C[e]
+                    if e_capacity < min_:
+                        min_ = e_capacity
+
+                gamma = epsilon*min(D[i_star][2], min_)
+                print(f'gamma: {gamma}')
+
+                if L[f'l_{i_star}_{tau}'] < alpha[i_star]*D[i_star][2]-F_i_tau(i_star, tau-1):
+                    gamma = min(gamma, epsilon*(alpha[i_star]*D[i_star][2]-F_i_tau(i_star, tau-1)))
+                
+                print(f'gamma: {gamma}')
+
+                # if g < U:
+                #     gamma = min(gamma, epsilon*U/u[f'u_{i_star}_{p_star}_{t_star}'])
+                
+                print(f'gamma: {gamma}')
+                
+                for e in P[i_star][p_star]:
+                    print(f"Bef updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")
+                    Y[f'y_{e}_{t_star}'] = Y[f'y_{e}_{t_star}']*np.exp(gamma/C_e_t[f'C_{e}_{t_star}_{tau}'])
+                    print(f"Aft updating: Y[f'y_{e}_{t_star}'] : {Y[f'y_{e}_{t_star}']}")     
+                
+                
+                Q[f'q_{i_star}'] = Q[f'q_{i_star}']*np.exp(gamma/(D[i_star][2]-F_i_tau(i_star, tau-1)))
+
+                Z[f'z_{i_star}'] = Z[f'z_{i_star}']*np.exp(-gamma/(alpha[i_star]*D[i_star][2]-F_i_tau(i_star, tau-1)))
+
+                F[f'f_{i_star}_{p_star}_{t_star}'] = F[f'f_{i_star}_{p_star}_{t_star}'] + (epsilon/scale)*gamma
+                print(f'f_{i_star}_{p_star}_{t_star} updated by  {(epsilon/scale)*gamma}')
+            
+                print(F)
+            
+            # break
+
+            if isInfeasible:
+                print(f'max alpha: {[a - 0.1 for a in alpha]}')
+                break
+        """
+            End Calendering Paper implementation
+        """
+
+
+        """
+            Begin Post Processing and Edge capacity checks
+        """
+        t_begin_post = time.time()
+        #We have a prelimnary value of f now:
+        print(colors.bright_blue+'Computed f by Youngs method')
+        print(F)
+
+        for f, v in F.items():
+            F[f] = round(v)
+
+        print(colors.light_green + 'Clipped F by rounding')
+        print(F)   #Clipped values of f
+
+        #Heursitic to correct the edge usage and adjust allocations
+        alpha = [l_i_tau(i, 0)/D[i][2] for i in range(N)]
+        print(alpha)
+
+        def get_edge_allocations():
+            edge_alloc = {}
+            for e in range(len(E)):
+                for t in range(T+1):
+                    edge_alloc[f'e_{e}_{t}'] = 0
+
+            #Find the total allocation on an edge at time t
+            for i in range(N):
+                for idx, p in enumerate(P[i]):
+                    for e in p:
+                        for t in range(D[i][3], D[i][4]+1):
+                            edge_alloc[f'e_{e}_{t}'] += F[f'f_{i}_{idx}_{t}']
+            return edge_alloc
+
+        edge_allocation = get_edge_allocations()
+        print(colors.bright_white + 'The edge allocations are given below')
+        print(edge_allocation)
+
+        #Find the edges where allocation exceeds capacity
+        def get_conflicts(edge_alloc):
+            conflicts = {} 
+            for e in range(len(E)):
+                for t in range(T+1):
+                    if edge_alloc[f'e_{e}_{t}'] > C[e]:
+                        #Find the paths that flow through this edge and 
+                        #contribute to the flow on edge 'e' at time 't'
+                        p_lst = []
+                        for (i, p_idx) in edge_path_map[e]:
+                            if t>=D[i][3] and t<=D[i][4] and F[f'f_{i}_{p_idx}_{t}'] > 0:
+                                p_lst.append((p_idx, i, alpha[idx]))
+                        conflicts[(e, t)] = p_lst
+            return conflicts
+
+        conflicts_ = get_conflicts(edge_allocation)
+        print(colors.pure_red+'detected conflicts')
+        print(conflicts_)
+
+        def remove_flow(conflicts):
+            #Sort the flows along each conflicted edge in descending order of alpha(fraction completed)
+            for e, paths in conflicts.items():
+                paths.sort(key=lambda tup: tup[2])
+
+            print(colors.light_green+'Sorted Conflicts')
+            print(conflicts)
+            #Remove the flow with max alpha
+            for edge_time, paths in conflicts.items():
+                _ , t = edge_time
+                p_idx, i, alpha_i = paths[0]
+                F[f'f_{i}_{p_idx}_{t}'] = 0
+                del paths[0]
+
+            return conflicts
+
+        #Recompute the conflicts, while no conflicts remain repeat
+        while len(conflicts_.keys()) > 0:
+            conflicts_ = remove_flow(conflicts_)
+            print(colors.yellow + f'After removing flow with max alpha \nUpdated F:')
+            print(F)
+
+            print(colors.dark_green + f'Conflicts after removing flow')
+            print(conflicts_)
+            
+            edge_allocation = get_edge_allocations()
+            print(colors.bright_white + f'Recomputed Edge Allocations')
+            print(edge_allocation)
+            
+            conflicts_ = get_conflicts(edge_allocation)
+            print(colors.pure_red + f'Recomputed Coflicts')
+            print(conflicts_)
+
+        t_end_tau = time.time()
+        t_end_post = time.time()
+        print(colors.bright_white+f'Time Taken for Post Processing: {t_end_post-t_begin_post} seconds')
+        print(colors.bright_white+f'Total Time Taken for tau : {t_end_tau-t_start_tau} seconds')
+
+        def debug():
+            for f, v in F.items():
+                if v>0:
+                    _, d_idx, p_idx, t = f.split('_')   # ['f', 'demand_idx', 'path_idx', 'time']
+                    # print(d_idx, p_idx, t)
+                    # print(P)
+                    # print(P[int(d_idx)][int(p_idx)])
+                    flow_str = f'At time: {t} for demand: {D[int(d_idx)]}'
+                    for e in P[int(d_idx)][int(p_idx)]:
+                        flow_str += f' -> (Edge {E[e]} with Capacity_{C[e]})'
+                    flow_str += f' : allocted {v} EPR'
+                    print(flow_str)
+        debug()
+    
+    end = time.time()
+    print(f'time taken: {end-start}')
+    print('eprserved: ', sum(F.values()))
+    print(f'Total EPRs requested: {sum([D[i][2] for i in range(len(D))])}')
+
+    D_alloc = [0 for i in range(len(D))]
+    for i in range(len(D)):
+        for p_idx, p in enumerate(P[i]):
+            for t in range(D[i][3], D[i][4]+1):
+                D_alloc[i] += F[f'f_{i}_{p_idx}_{t}']
+    
+    return D_alloc, end-start
+
+
+
+
+start_nodes, end_nodes, D_size, DST, DT, Demands, D_alloc, t_exec_yng = youngs(v, N, T)
+lp_alloc, t_exec_lp = lp(start_nodes, end_nodes, D_size, DST, DT, N, T)
+yo_alloc, t_exec_yo = youngs_online(start_nodes, end_nodes, D_size, DST, DT, N, T)
+lp_alloc = [int(i) for i in lp_alloc]
 print(f'D: {Demands}')
 print(f'Y: {D_alloc}')
 print(f'L: {lp_alloc}')
+print(f'YO: {yo_alloc}')
 
 print(f'Total EPR Req: {sum(Demands)}')
-print(f'eprserved_lp: {sum(lp_alloc)}')
 print(f'eprserved_yng: {sum(D_alloc)}')
+print(f'eprserved_lp: {sum(lp_alloc)}')
+print(f'eprserved_yo: {sum(yo_alloc)}')
 
+print(f'Time Taken Yng: {t_exec_yng}')
+print(f'Time Taken LP: {t_exec_lp}')
+print(f'Time Taken YO: {t_exec_yo}')
